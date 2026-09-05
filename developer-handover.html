@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>e-osvita — передача проєкту розробнику</title>
-  <meta name="description" content="Практичний документ передачі платформи e-osvita новому розробнику">
+  <title>u.Освіта — передача проєкту розробнику</title>
+  <meta name="description" content="Практичний документ передачі платформи u.Освіта новому розробнику">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <div class="brand">e-osvita</div>
+      <div class="brand">u.Освіта</div>
       <div class="version">Developer Handover · 05.09.2026</div>
       <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 10px" href="index.html">← Інтеграційне API</a>
       <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="swagger.html">Живий Swagger API →</a>
@@ -39,7 +39,7 @@
     <main>
       <header class="hero">
         <div class="eyebrow">Записка наступному розробнику</div>
-        <h1>Як зайти в e-osvita і нічого не зламати</h1>
+        <h1>Як зайти в u.Освіта і нічого не зламати</h1>
         <p class="lead">Не екскурсія по папках, а порядок входу в проєкт: що запустити, які доступи забрати, де шукати синхронізацію і що перевірити до першого коміту.</p>
         <div class="meta">
           <span class="pill">Node.js + TypeScript</span>
@@ -51,7 +51,7 @@
 
       <section id="intro">
         <h2>1. Що саме передається</h2>
-        <p>e-osvita — монорепозиторій із трьома окремими runtime-компонентами: Express API, BullMQ worker та React Admin SPA. Проєкт обслуговує мобільний застосунок, локальну PostgreSQL, зовнішню систему університету, OTP/SMS/email і банківський процесинг.</p>
+        <p>u.Освіта — монорепозиторій із трьома окремими runtime-компонентами: Express API, BullMQ worker та React Admin SPA. Проєкт обслуговує мобільний застосунок, локальну PostgreSQL, зовнішню систему університету, OTP/SMS/email і банківський процесинг.</p>
         <div class="callout warning"><strong>Головне правило підтримки:</strong> API без worker виглядає працездатним, але синхронізації не виконуються. Під час діагностики завжди перевіряйте API, worker, PostgreSQL і Redis окремо.</div>
         <table>
           <thead><tr><th>Компонент</th><th>Точка входу</th><th>Роль</th></tr></thead>
@@ -317,7 +317,7 @@ psql -d mydb -c "select now();"</code></pre>
         <div class="callout good"><strong>Критерій успішної передачі:</strong> новий розробник самостійно запускає систему, знаходить потрібний код, виконує безпечну зміну, проводить її через перевірки та може діагностувати зупинену синхронізацію без усних підказок.</div>
       </section>
 
-      <div class="footer">e-osvita · Developer Handover · автономний документ</div>
+      <div class="footer">u.Освіта · Developer Handover · автономний документ</div>
     </main>
   </div>
   <script src="app.js"></script>

@@ -14,7 +14,7 @@ fi
   --disable-gpu \
   --no-pdf-header-footer \
   --print-to-pdf="$DOCS_DIR/e-osvita-university-integration-guide.pdf" \
-  "file://$DOCS_DIR/index.html"
+  "file://$DOCS_DIR/integration-guide.html"
 
 "$CHROME_BIN" \
   --headless=new \

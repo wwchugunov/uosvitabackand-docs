@@ -34,7 +34,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     if (event.request.method !== 'POST') return json({ code: 'METHOD_NOT_ALLOWED', message: 'Використовуйте POST' }, 405);
     if (event.request.headers.get('Authorization') !== `Basic ${btoa('test:123')}`) {
-      return json({ code: 'UNAUTHORIZED', message: 'Використайте username test і password 123' }, 401, { 'WWW-Authenticate': 'Basic realm="e-osvita mock"' });
+      return json({ code: 'UNAUTHORIZED', message: 'Використайте username test і password 123' }, 401, { 'WWW-Authenticate': 'Basic realm="u.Освіта mock"' });
     }
     const endpoint = url.pathname.slice(MOCK_PREFIX.length).replace(/\/$/, '');
     if (!(endpoint in payloads)) return json({ code: 'NOT_FOUND', message: 'Mock endpoint не знайдено' }, 404);

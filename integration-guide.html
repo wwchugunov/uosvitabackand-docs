@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>u.Освіта — інтеграція університету</title>
+  <meta name="description" content="Технічний та організаційний посібник з інтеграції університету з платформою u.Освіта">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">u.Освіта</div>
+      <div class="version">University Integration Guide · draft 1.0</div>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="swagger.html">Живий Swagger API →</a>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="application-overview.html">Опис застосунку →</a>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="developer-handover.html">Передача розробнику →</a>
+      <nav class="toc" aria-label="Зміст">
+        <a href="#purpose">1. Призначення</a>
+        <a href="#status">2. Статус реалізації</a>
+        <a href="#architecture">3. Архітектура</a>
+        <a href="#data">4. Каталог даних</a>
+        <a href="#provider-api">5. API університету</a>
+        <a href="#examples">6. Приклади</a>
+        <a href="#sync">7. Синхронізація</a>
+        <a href="#security">8. Безпека</a>
+        <a href="#tenancy">9. Ізоляція університетів</a>
+        <a href="#errors">10. Помилки</a>
+        <a href="#sla">11. SLA</a>
+        <a href="#onboarding">12. Підключення</a>
+        <a href="#acceptance">13. Приймання</a>
+        <a href="#mobile-api">14. API застосунку</a>
+        <a href="#gaps">15. Відомі обмеження</a>
+        <a href="#contacts">16. Супровід</a>
+      </nav>
+      <button class="print-button" type="button" data-print>Друкувати / PDF</button>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none" href="e-osvita-university-integration-guide.pdf" download>Завантажити готовий PDF</a>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">Робочий документ / редакція власника проєкту</div>
+        <h1>Як університет підключається до u.Освіта</h1>
+        <p class="lead">Тут зафіксовано не абстрактне «API для освіти», а конкретний обмін, який уже читає цей backend: студент, розклад, оцінки, календар, баланс, оплати та знижки.</p>
+        <div class="meta">
+          <span class="pill">Версія: 1.0 draft</span>
+          <span class="pill">Мова даних: UTF-8</span>
+          <span class="pill">Формат: JSON / RSS</span>
+          <span class="pill">Оновлено: 05.09.2026</span>
+        </div>
+      </header>
+
+      <section id="purpose">
+        <h2>1. Навіщо я зібрав цей документ</h2>
+        <p>Щоб на першій зустрічі з університетом не пояснювати систему «на пальцях». ІТ-служба бачить контракт і вимоги до мережі, власник даних — перелік полів, служба безпеки — точки доступу, а команда u.Освіта — однакові критерії приймання.</p>
+        <div class="callout"><strong>Моя межа чесності.</strong> Те, що реально знайдено в коді, позначено як поточна реалізація. Те, що потрібно для нормальної багатоуніверситетської роботи, позначено як ціль. Ці речі не змішані навмисно.</div>
+        <div class="grid">
+          <div class="card"><strong>Університет надає</strong>Захищений API до своєї інформаційної системи та тестові дані без персональних даних реальних студентів.</div>
+          <div class="card"><strong>u.Освіта виконує</strong>Періодичне читання даних, нормалізацію, збереження у PostgreSQL та надання даних застосунку.</div>
+          <div class="card"><strong>Дані не змішуються</strong>Кожен запис має належати визначеному університету; доступ контролюється на backend.</div>
+          <div class="card"><strong>Підхід до змін</strong>Контракт версіонується. Несумісні зміни випускаються лише в новій major-версії.</div>
+        </div>
+      </section>
+
+      <section id="status">
+        <h2>2. Де ми зараз — без презентаційного глянцю</h2>
+        <table>
+          <thead><tr><th>Область</th><th>Поточна реалізація</th><th>Цільова модель</th></tr></thead>
+          <tbody>
+            <tr><td>Провайдер</td><td class="current">Один MAUP-подібний API</td><td class="target">Окремий адаптер і конфігурація для кожного університету</td></tr>
+            <tr><td>Credentials</td><td class="current">Спільні значення в environment</td><td class="target">Зашифровані credentials на рівні університету</td></tr>
+            <tr><td>Авторизація провайдера</td><td>HTTP Basic Auth</td><td>mTLS або OAuth 2.0 Client Credentials; Basic — лише як сумісний варіант</td></tr>
+            <tr><td>Історія запусків</td><td class="current">Зберігається переважно поточний стан</td><td class="target">Незмінний журнал кожного запуску та спроби</td></tr>
+            <tr><td>Ізоляція адміністраторів</td><td class="current">Глобальна роль ADMIN</td><td class="target">Доступ адміністратора лише до дозволених organizationId</td></tr>
+            <tr><td>Branding</td><td class="current">Відсутній як модель університету</td><td class="target">Логотип, кольори, назва, функції та контакти для кожного tenant</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warning"><strong>Важливо.</strong> Цей документ описує фактичні поля поточного адаптера й одночасно фіксує вимоги, які треба виконати перед підключенням кількох університетів у production. Позначені цільові функції не слід вважати вже реалізованими.</div>
+      </section>
+
+      <section id="architecture">
+        <h2>3. Архітектура обміну</h2>
+        <pre><code>Інформаційна система університету
+        │ HTTPS + автентифікація
+        ▼
+University Provider API
+        │ періодичне читання
+        ▼
+u.Освіта API → BullMQ → Worker
+                         │
+                         ▼
+                  Prisma → PostgreSQL
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+        Мобільний API          Admin API</code></pre>
+        <p>u.Освіта працює як клієнт API університету. Університет не повинен напряму підключатися до PostgreSQL u.Освіта. Фоновий worker отримує завдання через Redis, викликає API університету, перевіряє відповідь і записує нормалізовані дані.</p>
+        <div class="callout good">Рекомендована мережна модель: allowlist IP, TLS 1.2+, окремий service account, read-only доступ, обмеження частоти, correlation ID і журнал звернень.</div>
+      </section>
+
+      <section id="data">
+        <h2>4. Повний каталог даних платформи</h2>
+        <table>
+          <thead><tr><th>Домен</th><th>Сутності</th><th>Власник / джерело</th><th>Чутливість</th></tr></thead>
+          <tbody>
+            <tr><td>Особа</td><td>ПІБ, телефон, email, ІПН, підтвердження контактів, роль</td><td>Користувач + університет</td><td>Висока, персональні дані</td></tr>
+            <tr><td>Студент</td><td>Зовнішній ID, курс, семестр, форма, спеціальність, статус, період навчання</td><td>Університет</td><td>Висока</td></tr>
+            <tr><td>Структура</td><td>Університет, факультет/інститут, кафедра, група, дисципліна</td><td>Університет</td><td>Звичайна</td></tr>
+            <tr><td>Інфраструктура</td><td>Корпуси, адреси, координати, аудиторії</td><td>Університет</td><td>Звичайна</td></tr>
+            <tr><td>Навчання</td><td>Розклад, екзамени, викладачі, оцінки, кредити, навчальний календар</td><td>Університет</td><td>Висока</td></tr>
+            <tr><td>Оплата навчання</td><td>Баланс, історія оплат, знижки, пільги</td><td>Університет</td><td>Висока, фінансова</td></tr>
+            <tr><td>Банківські платежі</td><td>Платіж, стан транзакції, шаблон, маскований PAN, токен картки</td><td>Процесинг</td><td>Критична</td></tr>
+            <tr><td>Комунікації</td><td>Новини, посилання, дата публікації</td><td>Університет</td><td>Звичайна</td></tr>
+            <tr><td>Безпека</td><td>JWT, OTP, невдалі входи, блокування</td><td>u.Освіта</td><td>Критична</td></tr>
+            <tr><td>Операції</td><td>Стани синхронізації, cron, помилка, лічильник спроб</td><td>u.Освіта</td><td>Службова</td></tr>
+          </tbody>
+        </table>
+        <h3>Правила даних</h3>
+        <ul>
+          <li>Зовнішній `student_id` має бути стабільним і не перевикористовуватися.</li>
+          <li>Дати передаються в ISO 8601; дата без часу — `YYYY-MM-DD`, час — із часовим поясом.</li>
+          <li>Телефон передається в міжнародному форматі без пробілів.</li>
+          <li>Порожнє значення — `null`, а не порожній рядок, якщо поле допускає відсутність.</li>
+          <li>Грошові значення мають супроводжуватися валютою у цільовій версії контракту.</li>
+          <li>Усі рядки — UTF-8; назви не повинні містити HTML або виконуваний код.</li>
+        </ul>
+      </section>
+
+      <section id="provider-api" class="page-break">
+        <h2>5. API, яке надає університет</h2>
+        <p>Базовий URL і credentials узгоджуються під час підключення. Поточний адаптер надсилає JSON через `POST` і використовує Basic Auth. Доступні <a href="swagger.html">інтерактивний Swagger API</a> та <a href="openapi-university-provider.yaml">OpenAPI YAML</a>.</p>
+        <table>
+          <thead><tr><th>Метод</th><th>Шлях</th><th>Призначення</th><th>Ключ запиту</th></tr></thead>
+          <tbody>
+            <tr><td><span class="method">POST</span></td><td><code>/studentinfo</code></td><td>Пошук студентських профілів</td><td><code>phone_number</code> або <code>student_id</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/saldo</code></td><td>Баланс навчання</td><td><code>student_id</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/schedule</code></td><td>Розклад і екзамени</td><td><code>student_id</code>, <code>semestr</code>, опційно <code>zes_schedule</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/marks</code></td><td>Оцінки</td><td><code>student_id</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/calgraph</code></td><td>Навчальний календар</td><td><code>student_id</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/payments</code></td><td>Історія оплат</td><td><code>student_id</code></td></tr>
+            <tr><td><span class="method">POST</span></td><td><code>/discounts</code></td><td>Знижки та пільги</td><td><code>student_id</code></td></tr>
+            <tr><td><span class="method">GET</span></td><td><code>/</code> RSS URL</td><td>Новини університету</td><td>Без тіла</td></tr>
+          </tbody>
+        </table>
+        <h3>Стандарт відповіді та HTTP-коди</h3>
+        <table>
+          <thead><tr><th>Код</th><th>Значення</th><th>Повтор</th></tr></thead>
+          <tbody>
+            <tr><td>200</td><td>Запит оброблено; порожній масив означає, що даних немає</td><td>Ні</td></tr>
+            <tr><td>400</td><td>Невалідне тіло запиту</td><td>Лише після виправлення</td></tr>
+            <tr><td>401/403</td><td>Помилка автентифікації або прав</td><td>Ні, потрібна ескалація</td></tr>
+            <tr><td>404</td><td>Студента не знайдено</td><td>Ні</td></tr>
+            <tr><td>409</td><td>Конфлікт версії/стану</td><td>Після повторного читання</td></tr>
+            <tr><td>429</td><td>Перевищено rate limit</td><td>Так, за `Retry-After`</td></tr>
+            <tr><td>500</td><td>Внутрішня помилка університету</td><td>Так, exponential backoff</td></tr>
+            <tr><td>503</td><td>Тимчасова недоступність</td><td>Так, exponential backoff</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="examples">
+        <h2>6. Основні приклади</h2>
+        <h3>Профіль студента</h3>
+        <pre><code>POST /studentinfo
+Authorization: Basic ***
+Content-Type: application/json
+
+{ "phone_number": "380501112233" }</code></pre>
+        <pre><code>[
+  {
+    "student_id": 10001,
+    "last_name": "Коваленко",
+    "first_name": "Анна",
+    "middle_name": "Олександрівна",
+    "nsb": "Контракт 2026-001",
+    "group": "ІПЗ-31",
+    "course": 3,
+    "institute": "Факультет інформаційних технологій",
+    "level_learn": "Бакалавр",
+    "form_learn": "Денна",
+    "speciality": "Інженерія програмного забезпечення",
+    "specialization": "Програмні системи",
+    "qualification": "Бакалавр",
+    "price": 32000,
+    "price_pay_period": "Семестр",
+    "price_pay_type": "Контракт",
+    "sex": "F",
+    "ipn": "0000000000",
+    "phone_number": "380501112233",
+    "education_start": "2024-09-01",
+    "education_end": "2028-06-30"
+  }
+]</code></pre>
+        <h3>Розклад</h3>
+        <pre><code>POST /schedule
+{ "student_id": 10001, "semestr": 5 }</code></pre>
+        <pre><code>[
+  {
+    "student_id": 10001,
+    "semestr": 5,
+    "zes_schedule": 0,
+    "from_date": "2026-09-01",
+    "to_date": "2026-12-20",
+    "schedule": [
+      {
+        "pair_idx": 1,
+        "from_time": "09:00",
+        "to_time": "10:30",
+        "pair_kind": "Лекція",
+        "pair_subject": "Архітектура ПЗ",
+        "pair_auditorium": "305",
+        "pair_prepod": "Іваненко О. М.",
+        "subject_id": 301,
+        "auditorium_id": 305,
+        "prepod_id": 501,
+        "day_date": "2026-09-07"
+      }
+    ]
+  }
+]</code></pre>
+        <h3>Історія оплат</h3>
+        <pre><code>[
+  {
+    "student_id": 10001,
+    "payments": [
+      {
+        "date": "2026-09-01",
+        "operation_name": "Оплата за навчання",
+        "document_type": "Банківська квитанція",
+        "payment_value": 16000
+      }
+    ]
+  }
+]</code></pre>
+      </section>
+
+      <section id="sync">
+        <h2>7. Синхронізація</h2>
+        <table>
+          <thead><tr><th>Набір</th><th>Поточний тип</th><th>Рекомендована частота</th><th>Ідемпотентний ключ</th></tr></thead>
+          <tbody>
+            <tr><td>Розклад</td><td><code>STUDENT_SCHEDULES_SYNC</code></td><td>Кожні 6 годин + вручну</td><td>student + semester + event</td></tr>
+            <tr><td>Екзамени</td><td><code>STUDENT_EXAMS_SYNC</code></td><td>Щодня; частіше під час сесії</td><td>student + semester + event</td></tr>
+            <tr><td>Оцінки</td><td><code>STUDENT_SCORES_SYNC</code></td><td>Щодня</td><td>organization + student + discipline + semester</td></tr>
+            <tr><td>Навчальний план</td><td><code>STUDENT_EDUCATION_PLAN_SYNC</code></td><td>Щодня</td><td>student + semester + type + dates</td></tr>
+            <tr><td>Баланс</td><td><code>EDUCATION_PAYMENT_STATE_SYNC</code></td><td>Кілька разів на день</td><td>student</td></tr>
+            <tr><td>Історія оплат</td><td><code>STUDENT_PAYMENT_HISTORY_SYNC</code></td><td>Щодня</td><td>student + date + document</td></tr>
+            <tr><td>Знижки</td><td><code>STUDENT_PAYMENT_DISCOUNTS_SYNC</code></td><td>Щодня</td><td>student + discount ID</td></tr>
+            <tr><td>Новини</td><td><code>ORGANIZATION_ARTICLES_SYNC</code></td><td>Кожні 30–60 хвилин</td><td>organization + hash/link</td></tr>
+          </tbody>
+        </table>
+        <p>Повторний запуск із тим самим набором даних не повинен створювати дублікати. Видалення даних у джерелі потребує узгодженої стратегії: tombstone, ознака `deleted`, повний snapshot або окремий endpoint змін.</p>
+        <div class="callout warning">PostgreSQL зберігає поточний стан синхронізації, але не повну історію кожної спроби. Для production-аудиту потрібна окрема сутність SynchronizationRun.</div>
+      </section>
+
+      <section id="security" class="page-break">
+        <h2>8. Безпека і персональні дані</h2>
+        <h3>Обов’язкові вимоги</h3>
+        <ul>
+          <li>TLS 1.2 або новіший із валідним сертифікатом. Вимикати перевірку сертифіката у production заборонено.</li>
+          <li>Окремий service account для u.Освіта з мінімальними read-only правами.</li>
+          <li>Ротація секретів, журнал доступу та процедура відкликання.</li>
+          <li>Не передавати passwords, повні реквізити карток або CVV.</li>
+          <li>Маскувати ІПН, телефон та фінансові дані у логах.</li>
+          <li>Обмежити API за IP, rate limit і максимальним розміром відповіді.</li>
+          <li>Визначити строки зберігання, підставу обробки й процедуру видалення персональних даних.</li>
+          <li>Тестове середовище не повинно містити реальних персональних даних.</li>
+        </ul>
+        <h3>Рекомендовані заголовки</h3>
+        <pre><code>X-Correlation-Id: UUID
+X-Request-Timestamp: 2026-09-05T12:00:00Z
+Content-Type: application/json
+Accept: application/json</code></pre>
+        <div class="callout danger"><strong>Поточний ризик:</strong> існуючий MAUP-клієнт використовує `rejectUnauthorized: false`. Перед реальною інтеграцією перевірку TLS потрібно обов’язково ввімкнути.</div>
+      </section>
+
+      <section id="tenancy">
+        <h2>9. Ізоляція університетів в одній базі</h2>
+        <p>Одна PostgreSQL може безпечно обслуговувати багато університетів, якщо кожен доменний запис однозначно належить tenant. Фільтрації лише у frontend недостатньо.</p>
+        <pre><code>JWT адміністратора
+  → дозволені organizationId
+  → tenant middleware
+  → примусовий organizationId у запиті
+  → Prisma
+  → PostgreSQL</code></pre>
+        <table>
+          <thead><tr><th>Контроль</th><th>Вимога</th></tr></thead>
+          <tbody>
+            <tr><td>Адміністратори</td><td>Окрема таблиця доступів user ↔ organization із роллю</td></tr>
+            <tr><td>Запити</td><td>Backend сам додає tenant filter, не довіряє organizationId від браузера</td></tr>
+            <tr><td>Інтеграції</td><td>Окремі URL, credentials і timeout для кожного університету</td></tr>
+            <tr><td>Черги</td><td>Job ID містить organizationId; worker повторно перевіряє належність</td></tr>
+            <tr><td>Файли</td><td>Окремий namespace для логотипів і документів</td></tr>
+            <tr><td>Аудит</td><td>Кожна адміністративна дія містить actorId та organizationId</td></tr>
+            <tr><td>Тести</td><td>Спроба адміністратора A прочитати tenant B завжди повертає 403</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="errors">
+        <h2>10. Формат помилок і діагностика</h2>
+        <p>Цільовий стабільний формат:</p>
+        <pre><code>{
+  "error": {
+    "code": "STUDENT_NOT_FOUND",
+    "message": "Student was not found",
+    "correlationId": "3aa8...",
+    "retryable": false,
+    "details": []
+  }
+}</code></pre>
+        <p>u.Освіта зараз має власні коди на кшталт <code>VALIDATION_ERROR</code>, <code>ANOTHER_SERVICE_EXCEPTION</code>, <code>STD_E002</code> і <code>ORG_E001</code>. Для університетського API потрібна окрема погоджена таблиця кодів, незалежна від тексту повідомлення.</p>
+        <div class="callout">Ідентифікатор запису SyncStatus не є ідентифікатором конкретного запуску або помилки. Для розслідування потрібні job ID, correlation ID та історія спроб.</div>
+      </section>
+
+      <section id="sla">
+        <h2>11. Рекомендований SLA</h2>
+        <table>
+          <thead><tr><th>Показник</th><th>Рекомендація</th></tr></thead>
+          <tbody>
+            <tr><td>Доступність</td><td>Не менше 99,5% на місяць, виключаючи погоджені роботи</td></tr>
+            <tr><td>Час відповіді</td><td>p95 ≤ 2 секунди, p99 ≤ 5 секунд</td></tr>
+            <tr><td>Timeout клієнта</td><td>10 секунд у поточній реалізації; бажано конфігурувати на tenant</td></tr>
+            <tr><td>Rate limit</td><td>Погоджується за кількістю студентів; відповідь 429 містить Retry-After</td></tr>
+            <tr><td>RPO</td><td>Не більше інтервалу відповідної синхронізації</td></tr>
+            <tr><td>RTO</td><td>До 4 годин для навчальних даних; окремо погодити критичні фінансові потоки</td></tr>
+            <tr><td>Сповіщення про роботи</td><td>Не менше ніж за 3 робочі дні</td></tr>
+            <tr><td>Критичний інцидент</td><td>Підтвердження отримання до 30 хвилин</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="onboarding" class="page-break">
+        <h2>12. Процес підключення університету</h2>
+        <ol>
+          <li><strong>Власники.</strong> Призначити відповідальних за бізнес-дані, API, безпеку та підтримку.</li>
+          <li><strong>Scope.</strong> Визначити доступні модулі: профіль, розклад, оцінки, план, оплати, новини.</li>
+          <li><strong>Mapping.</strong> Заповнити таблицю відповідності полів локальної системи контракту u.Освіта.</li>
+          <li><strong>Тестовий API.</strong> Надати endpoint, credentials, allowlist і синтетичних студентів.</li>
+          <li><strong>Contract tests.</strong> Перевірити OpenAPI, типи, nullable-поля, дати, кодування й помилки.</li>
+          <li><strong>Навантаження.</strong> Узгодити rate limit і протестувати повну синхронізацію.</li>
+          <li><strong>Безпека.</strong> Провести review TLS, секретів, логування та персональних даних.</li>
+          <li><strong>UAT.</strong> Представники університету звіряють дані у застосунку.</li>
+          <li><strong>Production.</strong> Окремі production credentials, план запуску і rollback.</li>
+          <li><strong>Супровід.</strong> Моніторинг, SLA, контакти та процедура змін.</li>
+        </ol>
+      </section>
+
+      <section id="acceptance">
+        <h2>13. Критерії приймання</h2>
+        <table>
+          <thead><tr><th>Перевірка</th><th>Очікуваний результат</th></tr></thead>
+          <tbody>
+            <tr><td>Пошук існуючого студента</td><td>Повертається повний і правильний профіль</td></tr>
+            <tr><td>Невідомий студент</td><td>404 або погоджений порожній результат без 500</td></tr>
+            <tr><td>Кирилиця та апостроф</td><td>UTF-8 не пошкоджується</td></tr>
+            <tr><td>Порожні optional-поля</td><td>Передається `null`, клієнт не падає</td></tr>
+            <tr><td>Повторний запит</td><td>Дані стабільні, дублікати не виникають</td></tr>
+            <tr><td>Зміна розкладу</td><td>Подія оновлюється, а не дублюється</td></tr>
+            <tr><td>Timeout/503</td><td>u.Освіта повторює запит із backoff і фіксує помилку</td></tr>
+            <tr><td>Ізоляція tenant</td><td>Дані одного університету недоступні іншому</td></tr>
+            <tr><td>Відкликані credentials</td><td>Доступ припиняється, секрет не з’являється у логах</td></tr>
+            <tr><td>Повна вибірка</td><td>Узгоджений обсяг обробляється в межах SLA</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="mobile-api">
+        <h2>14. API u.Освіта для застосунку та адміністрування</h2>
+        <p>Ці endpoints надає сама u.Освіта. Вони не замінюють Provider API університету.</p>
+        <table>
+          <thead><tr><th>Префікс</th><th>Призначення</th><th>Приклади</th></tr></thead>
+          <tbody>
+            <tr><td><code>/v1/auth</code></td><td>Реєстрація, OTP, login, refresh, відновлення</td><td><code>/login</code>, <code>/refresh-tokens</code></td></tr>
+            <tr><td><code>/v1/students</code></td><td>Профіль і навчальні дані</td><td><code>/:id/schedule</code>, <code>/:id/scores</code></td></tr>
+            <tr><td><code>/v1/educations</code></td><td>Структура університету</td><td>organizations, departments, cafedras, groups</td></tr>
+            <tr><td><code>/v1/payments</code></td><td>Платежі та callback</td><td>templates, paymentRef, purchase</td></tr>
+            <tr><td><code>/v1/tokenization</code></td><td>Токени карток</td><td>card-tokens</td></tr>
+            <tr><td><code>/admin/api</code></td><td>Моніторинг і керування</td><td>students, organizations, sync-management</td></tr>
+          </tbody>
+        </table>
+        <p>Інтерактивний Swagger backend доступний у development за шляхом <code>/v1/docs/</code>. Перед передачею зовнішнім сторонам його слід очистити від адміністративних і внутрішніх операцій та зафіксувати версію.</p>
+      </section>
+
+      <section id="gaps">
+        <h2>15. Відомі обмеження поточного коду</h2>
+        <ul>
+          <li>Конфігурація MAUP є глобальною, а не окремою для кожного університету.</li>
+          <li>Перевірку TLS-сертифіката зовнішнього API вимкнено.</li>
+          <li>Формати відповідей описані TypeScript-типами, але runtime validation відповідей провайдера відсутня.</li>
+          <li>Назви на кшталт <code>semestr</code> і <code>discaunt_name</code> містять історичні помилки та мають бути стабілізовані версією контракту.</li>
+          <li>Відповіді помилок зовнішнього API перетворюються переважно на загальний `503`.</li>
+          <li>Немає повної історії запусків синхронізації.</li>
+          <li>Немає гарантованої транзакції між PostgreSQL і BullMQ.</li>
+          <li>Адміністративні права ще не ізольовані за університетом.</li>
+          <li>Branding і feature flags університету не представлені окремими моделями.</li>
+          <li>Prisma-схема та міграції мали розбіжність щодо статусу `SUSPENDED`.</li>
+        </ul>
+        <div class="callout warning">Перед укладанням інтеграційної угоди потрібні: затверджений OpenAPI 1.0, tenant-модель, contract tests, перевірка TLS, правила видалення даних і production SLA.</div>
+      </section>
+
+      <section id="contacts">
+        <h2>16. Супровід і керування змінами</h2>
+        <p>Для кожного університету в інтеграційному паспорті необхідно заповнити:</p>
+        <table>
+          <tbody>
+            <tr><th>Власник бізнес-даних</th><td>ПІБ, роль, email, телефон</td></tr>
+            <tr><th>Технічна підтримка університету</th><td>Групова адреса, телефон, години роботи</td></tr>
+            <tr><th>Підтримка u.Освіта</th><td>Групова адреса, escalation contact</td></tr>
+            <tr><th>Test / production endpoints</th><td>Заповнюються у захищеному реєстрі, не в цьому документі</td></tr>
+            <tr><th>Планові роботи</th><td>Канал і мінімальний строк попередження</td></tr>
+            <tr><th>Версія контракту</th><td>Major.minor.patch і дата введення</td></tr>
+          </tbody>
+        </table>
+        <p>Зміна назви поля, типу, обов’язковості або семантики вважається несумісною. Нові optional-поля можна додавати в minor-версії. Університет та u.Освіта повинні підтримувати попередню major-версію протягом погодженого перехідного періоду.</p>
+      </section>
+
+      <div class="footer">u.Освіта / робоча редакція / факти звірено з кодом репозиторію</div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
