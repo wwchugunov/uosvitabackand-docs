@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>e-osvita — передача проєкту розробнику</title>
+  <meta name="description" content="Практичний документ передачі платформи e-osvita новому розробнику">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">e-osvita</div>
+      <div class="version">Developer Handover · 05.09.2026</div>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 10px" href="index.html">← Інтеграційне API</a>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="application-overview.html">Опис застосунку</a>
+      <nav class="toc" aria-label="Зміст">
+        <a href="#intro">1. Що передається</a>
+        <a href="#architecture-h">2. Архітектура</a>
+        <a href="#start">3. Перший запуск</a>
+        <a href="#access">4. Доступи</a>
+        <a href="#code-map">5. Карта коду</a>
+        <a href="#flows-h">6. Ключові потоки</a>
+        <a href="#database">7. База даних</a>
+        <a href="#queues">8. Черги</a>
+        <a href="#frontend">9. Admin SPA</a>
+        <a href="#testing">10. Перевірки</a>
+        <a href="#risks">11. Борги та ризики</a>
+        <a href="#first-days">12. Перші дні</a>
+        <a href="#release">13. Реліз</a>
+        <a href="#incident">14. Інциденти</a>
+        <a href="#checklist">15. Акт передачі</a>
+      </nav>
+      <button class="print-button" type="button" data-print>Друкувати документ</button>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none" href="e-osvita-developer-handover.pdf" download>Завантажити PDF</a>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">Практичний документ передачі</div>
+        <h1>Передача проєкту e-osvita розробнику</h1>
+        <p class="lead">Що потрібно знати, отримати й перевірити, щоб безпечно підтримувати backend, worker, базу даних і адміністративну панель.</p>
+        <div class="meta">
+          <span class="pill">Node.js + TypeScript</span>
+          <span class="pill">PostgreSQL + Prisma</span>
+          <span class="pill">Redis + BullMQ</span>
+          <span class="pill">React Admin SPA</span>
+        </div>
+      </header>
+
+      <section id="intro">
+        <h2>1. Що саме передається</h2>
+        <p>e-osvita — монорепозиторій із трьома окремими runtime-компонентами: Express API, BullMQ worker та React Admin SPA. Проєкт обслуговує мобільний застосунок, локальну PostgreSQL, зовнішню систему університету, OTP/SMS/email і банківський процесинг.</p>
+        <div class="callout warning"><strong>Головне правило підтримки:</strong> API без worker виглядає працездатним, але синхронізації не виконуються. Під час діагностики завжди перевіряйте API, worker, PostgreSQL і Redis окремо.</div>
+        <table>
+          <thead><tr><th>Компонент</th><th>Точка входу</th><th>Роль</th></tr></thead>
+          <tbody>
+            <tr><td>API</td><td><code>src/index.ts</code>, <code>src/app.ts</code></td><td>HTTP, auth, validation, бізнес-операції</td></tr>
+            <tr><td>Worker</td><td><code>src/worker.ts</code></td><td>Фонові й періодичні синхронізації</td></tr>
+            <tr><td>Admin SPA</td><td><code>admin-spa/src/main.tsx</code></td><td>Операційний web-інтерфейс</td></tr>
+            <tr><td>Database</td><td><code>prisma/schema.prisma</code></td><td>Основне сховище даних</td></tr>
+            <tr><td>Deployment</td><td><code>Dockerfile</code>, <code>helm/</code></td><td>Збірка і Kubernetes</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="architecture-h">
+        <h2>2. Архітектура в одному рисунку</h2>
+        <pre><code>Mobile client ─┐
+               ├→ Express routes → validation → controller → service → Prisma → PostgreSQL
+Admin SPA ─────┘                                      │
+                                                      ├→ зовнішні API
+                                                      └→ BullMQ → Redis → Worker
+                                                                            │
+                                                                            └→ service → Prisma</code></pre>
+        <p>У проєкті немає окремого repository layer: більшість сервісів звертається до Prisma напряму. Маршрути мобільного API змонтовані на <code>/v1</code>, адміністративного — на <code>/admin/api</code>, production SPA — на <code>/admin</code>.</p>
+      </section>
+
+      <section id="start">
+        <h2>3. Перший локальний запуск</h2>
+        <h3>Вимоги</h3>
+        <ul>
+          <li>Node.js не нижче 20.9;</li>
+          <li>PostgreSQL;</li>
+          <li>Redis;</li>
+          <li>два набори npm dependencies: корінь і <code>admin-spa</code>;</li>
+          <li>локальний <code>.env</code>.</li>
+        </ul>
+        <pre><code>npm install
+cd admin-spa &amp;&amp; npm install &amp;&amp; cd ..
+
+npm run db:generate
+npm run db:migrate</code></pre>
+        <h3>Запуск у трьох терміналах</h3>
+        <pre><code># 1. API
+npm run dev
+
+# 2. Worker
+npm run worker:dev
+
+# 3. Admin SPA
+cd admin-spa
+npm run dev -- --host 127.0.0.1</code></pre>
+        <table>
+          <tbody>
+            <tr><th>Health</th><td><code>http://127.0.0.1:3000/v1/actuator/health</code></td></tr>
+            <tr><th>Swagger</th><td><code>http://127.0.0.1:3000/v1/docs/</code></td></tr>
+            <tr><th>Admin dev</th><td><code>http://127.0.0.1:5173/api/admin/</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="access" class="page-break">
+        <h2>4. Доступи, які треба передати окремо</h2>
+        <p>Секрети не повинні знаходитися в цьому документі або Git. Передача виконується через корпоративний password manager.</p>
+        <table>
+          <thead><tr><th>Доступ</th><th>Навіщо</th><th>Що перевірити</th></tr></thead>
+          <tbody>
+            <tr><td>GitLab</td><td>Код, merge requests, CI/CD</td><td>Рівень доступу, protected branches</td></tr>
+            <tr><td>Config maps / secrets</td><td>Environment усіх середовищ</td><td>Власник, rotation, різниця dev/test/prod</td></tr>
+            <tr><td>PostgreSQL</td><td>Міграції та діагностика</td><td>Окремі read-only і migration roles</td></tr>
+            <tr><td>Redis</td><td>Черги BullMQ</td><td>TLS, пароль, namespace, retention</td></tr>
+            <tr><td>Kubernetes</td><td>API/worker deployments</td><td>Namespaces, logs, rollback</td></tr>
+            <tr><td>MAUP API</td><td>Навчальні дані</td><td>Test/prod URL, allowlist, SLA</td></tr>
+            <tr><td>OTP/SMS/email</td><td>Реєстрація і recovery</td><td>Service accounts і quotas</td></tr>
+            <tr><td>TASLink</td><td>Платежі й токенізація</td><td>Test terminal, callback URLs</td></tr>
+            <tr><td>Kafka/Logstash</td><td>Централізовані логи</td><td>Topics, dashboards, retention</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="code-map">
+        <h2>5. Карта коду</h2>
+        <table>
+          <thead><tr><th>Папка</th><th>Що шукати</th></tr></thead>
+          <tbody>
+            <tr><td><code>src/routes</code></td><td>URL, HTTP-метод, auth і validation middleware</td></tr>
+            <tr><td><code>src/controllers</code></td><td>Перетворення HTTP-запиту у виклик сервісу</td></tr>
+            <tr><td><code>src/services</code></td><td>Основна бізнес-логіка та Prisma-запити</td></tr>
+            <tr><td><code>src/jobs</code></td><td>Обробники BullMQ</td></tr>
+            <tr><td><code>src/config/queue.ts</code></td><td>Оголошення черг та Redis connection</td></tr>
+            <tr><td><code>src/middlewares</code></td><td>JWT, validation, errors, XSS, logging</td></tr>
+            <tr><td><code>src/validations</code></td><td>Joi-схеми вхідних запитів</td></tr>
+            <tr><td><code>src/types</code></td><td>DTO зовнішніх систем і внутрішні типи</td></tr>
+            <tr><td><code>prisma</code></td><td>Схема та історія міграцій</td></tr>
+            <tr><td><code>admin-spa/src/pages</code></td><td>Сторінки React</td></tr>
+            <tr><td><code>admin-spa/src/services</code></td><td>Frontend API clients</td></tr>
+            <tr><td><code>docs</code></td><td>Синхронізація, платежі й observability</td></tr>
+          </tbody>
+        </table>
+        <p>Для вивчення функції проходьте вертикально: <code>route → validation → controller → service → Prisma/job</code>. Не починайте з читання всього сервісного шару поспіль.</p>
+      </section>
+
+      <section id="flows-h">
+        <h2>6. Ключові бізнес-потоки</h2>
+        <h3>Авторизація</h3>
+        <p>Телефон → OTP → User → password → access/refresh JWT. Refresh token зберігається у БД. Невдалі входи збільшують лічильник і можуть заблокувати login до recovery.</p>
+        <h3>Верифікація студента</h3>
+        <p>Авторизований користувач вибирає організацію → backend запитує `/studentinfo` → створює `UserStudent`, department/group → ставить фонові jobs.</p>
+        <h3>Синхронізація</h3>
+        <p>API додає job у Redis → worker викликає зовнішній API → нормалізує відповідь → змінює дані та `StudentSyncStatus`/`OrganizationSyncStatus`.</p>
+        <h3>Платіж</h3>
+        <p>Створення `StudentPayment` → payment link або token purchase → 3DS → callback/webhook → перевірка стану → `PaymentTranState`.</p>
+      </section>
+
+      <section id="database">
+        <h2>7. База даних і міграції</h2>
+        <p>Prisma-схема містить 28 моделей. Критичні зв’язки: `User → UserStudent → Department → Organization`, а також `StudentPayment → PaymentTranState`.</p>
+        <h3>Правила змін</h3>
+        <ol>
+          <li>Не редагувати вже застосовані production-міграції.</li>
+          <li>Створювати нову міграцію і переглядати SQL до застосування.</li>
+          <li>Перевіряти міграцію на чистій БД та копії production-схеми.</li>
+          <li>Планувати rollback або forward fix для незворотних змін.</li>
+          <li>Після зміни схеми запускати `prisma generate`, TypeScript build і tests.</li>
+        </ol>
+        <div class="callout danger"><strong>Відоме розходження:</strong> Prisma enum містив `SyncStatus.SUSPENDED`, але всі 29 міграцій не створювали це значення у PostgreSQL. У локальній тестовій БД воно було додано вручну; для репозиторію потрібна коректна міграція.</div>
+      </section>
+
+      <section id="queues">
+        <h2>8. Redis, BullMQ і worker</h2>
+        <p>Окремі черги існують для розкладу, екзаменів, оцінок, навчального плану, новин, платежів, знижок і recovery. Worker створює consumer для кожного типу з concurrency 5; janitor має concurrency 1.</p>
+        <h3>Під час проблеми перевірити</h3>
+        <ol>
+          <li>Чи доступний Redis.</li>
+          <li>Чи запущено worker deployment.</li>
+          <li>Waiting/active/failed jobs і repeatable configuration.</li>
+          <li>Чи не залишився DB status `RUNNING` після падіння.</li>
+          <li>Чи збігаються cron у PostgreSQL та Redis.</li>
+          <li>Чи є job idempotent при повторному запуску.</li>
+        </ol>
+        <div class="callout warning">Транзакція Prisma не охоплює Redis. Можливий стан «БД оновилась, job не створився» або навпаки. Це потрібно враховувати при recovery.</div>
+      </section>
+
+      <section id="frontend" class="page-break">
+        <h2>9. Admin SPA</h2>
+        <p>React 19 SPA використовує React Router, TanStack Query, Zustand, Axios, Chart.js і Tailwind. Серверні дані мають залишатися в TanStack Query, локальний UI state — у Zustand.</p>
+        <h3>Маршрути</h3>
+        <ul>
+          <li>Dashboard;</li>
+          <li>Students і Student Inspector;</li>
+          <li>Student Invite;</li>
+          <li>Jobs;</li>
+          <li>Organizations і Organization Detail.</li>
+        </ul>
+        <p>Перевіряйте одночасно три префікси: React Router `basename`, Vite `base` і Express mount. Зараз `/admin`, `/admin/api` та `/api/admin` не повністю уніфіковані. У репозиторії також залишились старі EJS-сторінки.</p>
+      </section>
+
+      <section id="testing">
+        <h2>10. Мінімальні перевірки перед зміною</h2>
+        <pre><code># Backend build
+npm run build
+
+# Admin build
+cd admin-spa &amp;&amp; npm run build
+
+# Runtime
+curl http://127.0.0.1:3000/v1/actuator/health
+redis-cli ping
+psql -d mydb -c "select now();"</code></pre>
+        <p>У `tests/integration` є тести auth, university, processing і transliteration. Штатний `npm test` зараз потребує виправлення: він викликає відсутній script `db:push`. Не вважайте зелену TypeScript-збірку доказом працездатності міграцій або інтеграцій.</p>
+        <h3>Обов’язкові набори тестів, яких бракує</h3>
+        <ul>
+          <li>authorization для кожного admin endpoint;</li>
+          <li>tenant isolation;</li>
+          <li>чиста послідовність усіх міграцій;</li>
+          <li>contract tests відповідей університету;</li>
+          <li>idempotency і retry jobs;</li>
+          <li>callback/webhook security;</li>
+          <li>end-to-end login, student verification і sync.</li>
+        </ul>
+      </section>
+
+      <section id="risks">
+        <h2>11. Відомий технічний борг і ризики</h2>
+        <table>
+          <thead><tr><th>Пріоритет</th><th>Проблема</th><th>Наслідок</th></tr></thead>
+          <tbody>
+            <tr><td>Critical</td><td>Неоднакова auth-перевірка admin routes</td><td>Несанкціоновані операції</td></tr>
+            <tr><td>Critical</td><td>Schema/migration drift</td><td>Runtime-помилки на чистій БД</td></tr>
+            <tr><td>High</td><td>TLS verification MAUP вимкнено</td><td>Ризик MITM</td></tr>
+            <tr><td>High</td><td>ADMIN не обмежений organizationId</td><td>Немає tenant-ізоляції</td></tr>
+            <tr><td>High</td><td>Немає історії sync runs та audit log</td><td>Складне розслідування</td></tr>
+            <tr><td>High</td><td>Немає атомарності DB + queue</td><td>Розходження станів</td></tr>
+            <tr><td>Medium</td><td>Стара EJS і нова SPA паралельно</td><td>Дублювання й різна поведінка</td></tr>
+            <tr><td>Medium</td><td>Історичні помилки назв полів</td><td>Складна інтеграція та міграції</td></tr>
+            <tr><td>Medium</td><td>npm dependency vulnerabilities</td><td>Потрібен контрольований upgrade</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="first-days">
+        <h2>12. План перших п’яти днів</h2>
+        <table>
+          <thead><tr><th>День</th><th>Результат</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Отримати доступи, запустити API/worker/SPA, пройти health і login</td></tr>
+            <tr><td>2</td><td>Пройти route → controller → service → Prisma для студентського профілю</td></tr>
+            <tr><td>3</td><td>Вручну простежити один job від Redis до запису в PostgreSQL</td></tr>
+            <tr><td>4</td><td>Перевірити платежі в test environment без реальних коштів</td></tr>
+            <tr><td>5</td><td>Зафіксувати environment matrix, runbook, ризики й першу безпечну задачу</td></tr>
+          </tbody>
+        </table>
+        <p>Добра перша задача: виправити test script, додати migration test і закрити auth на одному наборі admin endpoints. Не починати передачу з великого рефакторингу sync engine.</p>
+      </section>
+
+      <section id="release">
+        <h2>13. Релізний чек-лист</h2>
+        <ol>
+          <li>Зміни переглянуті іншим розробником.</li>
+          <li>Backend і admin SPA збираються.</li>
+          <li>Tests і migration test зелені.</li>
+          <li>Нові environment variables описані без секретів.</li>
+          <li>Міграція перевірена й має план відновлення.</li>
+          <li>Не змінено callback URLs або queue names без узгодження.</li>
+          <li>Оновлені версії package та Helm chart.</li>
+          <li>API і worker розгортаються як окремі workloads.</li>
+          <li>Після deployment перевірені health, login, Redis і контрольний job.</li>
+          <li>Відома команда rollback і відповідальна особа.</li>
+        </ol>
+      </section>
+
+      <section id="incident" class="page-break">
+        <h2>14. Короткий runbook інциденту</h2>
+        <h3>API не відповідає</h3>
+        <p>Перевірити pod/process, PostgreSQL connection, останню міграцію, config validation і application logs.</p>
+        <h3>Дані не оновлюються</h3>
+        <p>Перевірити worker, Redis, failed jobs, зовнішній API, credentials, `StudentSyncStatus`, stuck `RUNNING` і cron reconciliation.</p>
+        <h3>Помилки лише одного студента</h3>
+        <p>Перевірити externalId, статус студента, department/organization, останню помилку кожного sync type. Не виконувати wipe без резервного плану.</p>
+        <h3>Платіж завис</h3>
+        <p>Знайти `paymentRef`, `sid`, локальний status і `PaymentTranState`; звірити test/prod terminal та callback. Не змінювати фінальний статус SQL-командою без погодженої процедури.</p>
+        <h3>Після релізу зросли помилки</h3>
+        <p>Зупинити подальший rollout, порівняти API і worker versions, перевірити міграції, queue payload compatibility та виконати rollback.</p>
+      </section>
+
+      <section id="checklist">
+        <h2>15. Акт передачі</h2>
+        <table>
+          <thead><tr><th>Пункт</th><th>Статус / коментар</th></tr></thead>
+          <tbody>
+            <tr><td>Репозиторій і branches передані</td><td>____________________</td></tr>
+            <tr><td>Environment matrix передано</td><td>____________________</td></tr>
+            <tr><td>Secrets передані через захищений канал</td><td>____________________</td></tr>
+            <tr><td>Локальний запуск виконано разом</td><td>____________________</td></tr>
+            <tr><td>Deployment і rollback продемонстровано</td><td>____________________</td></tr>
+            <tr><td>Один sync job простежено</td><td>____________________</td></tr>
+            <tr><td>Test payment flow продемонстровано</td><td>____________________</td></tr>
+            <tr><td>Dashboards і логи доступні</td><td>____________________</td></tr>
+            <tr><td>Відкриті інциденти та борги зафіксовані</td><td>____________________</td></tr>
+            <tr><td>Контакти команд і SLA передані</td><td>____________________</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Передав:</strong> ____________________ &nbsp;&nbsp; <strong>Прийняв:</strong> ____________________</p>
+        <p><strong>Дата:</strong> ____________________ &nbsp;&nbsp; <strong>Версія/commit:</strong> ____________________</p>
+        <div class="callout good"><strong>Критерій успішної передачі:</strong> новий розробник самостійно запускає систему, знаходить потрібний код, виконує безпечну зміну, проводить її через перевірки та може діагностувати зупинену синхронізацію без усних підказок.</div>
+      </section>
+
+      <div class="footer">e-osvita · Developer Handover · автономний документ</div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

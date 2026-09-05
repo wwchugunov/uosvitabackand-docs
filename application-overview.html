@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>e-osvita — повний опис платформи</title>
+  <meta name="description" content="Стислий повний опис освітньої платформи e-osvita">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">e-osvita</div>
+      <div class="version">Опис платформи · версія 1.0</div>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="index.html">← Інтеграційне API</a>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none;margin:0 0 18px" href="developer-handover.html">Передача розробнику →</a>
+      <nav class="toc" aria-label="Зміст">
+        <a href="#summary">1. Загальна інформація</a>
+        <a href="#users">2. Користувачі</a>
+        <a href="#functions">3. Функції</a>
+        <a href="#components">4. Компоненти</a>
+        <a href="#data-model">5. Дані</a>
+        <a href="#flows">6. Основні процеси</a>
+        <a href="#admin">7. Адміністрування</a>
+        <a href="#integrations">8. Інтеграції</a>
+        <a href="#security-app">9. Безпека</a>
+        <a href="#deployment">10. Експлуатація</a>
+        <a href="#limits">11. Обмеження</a>
+        <a href="#development">12. Розвиток</a>
+      </nav>
+      <button class="print-button" type="button" data-print>Друкувати цей опис</button>
+      <a class="print-button" style="display:block;text-align:center;text-decoration:none" href="e-osvita-application-overview.pdf" download>Завантажити PDF опису</a>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">Окремий огляд продукту</div>
+        <h1>e-osvita: повний опис платформи</h1>
+        <p class="lead">Стисле, але достатньо повне пояснення призначення, можливостей, архітектури, даних та поточного стану системи.</p>
+        <div class="meta">
+          <span class="pill">Backend + Worker + Admin SPA</span>
+          <span class="pill">Node.js / React / PostgreSQL</span>
+          <span class="pill">Оновлено: 05.09.2026</span>
+        </div>
+      </header>
+
+      <section id="summary">
+        <h2>1. Загальна інформація</h2>
+        <p><strong>e-osvita</strong> — серверна освітня платформа для мобільного застосунку студента та внутрішньої адміністративної панелі. Вона об’єднує облікові записи користувачів, структуру університету, навчальні дані, фінансову інформацію та фонову синхронізацію із зовнішньою інформаційною системою закладу освіти.</p>
+        <p>Основна ідея: не звертатися до системи університету під час кожної дії студента, а періодично отримувати дані, перевіряти їх і зберігати локальну актуальну копію. Це прискорює мобільний API та дозволяє продовжувати читання вже синхронізованих даних під час короткочасної недоступності зовнішнього сервісу.</p>
+        <div class="grid">
+          <div class="card"><strong>Продукт</strong>Мобільний API для студентів і web-панель для операторів.</div>
+          <div class="card"><strong>Предметна область</strong>Освіта, розклад, оцінки, навчальний план, оплата та новини.</div>
+          <div class="card"><strong>Джерела</strong>PostgreSQL, API університету, банківський процесинг, OTP/SMS/email.</div>
+          <div class="card"><strong>Фонові процеси</strong>BullMQ worker із Redis, повторні спроби та контроль станів.</div>
+        </div>
+      </section>
+
+      <section id="users">
+        <h2>2. Користувачі системи</h2>
+        <table>
+          <thead><tr><th>Користувач</th><th>Потреба</th><th>Можливості</th></tr></thead>
+          <tbody>
+            <tr><td>Студент</td><td>Мати навчальні сервіси в одному застосунку</td><td>Профіль, розклад, екзамени, оцінки, план, оплата, знижки, новини</td></tr>
+            <tr><td>Оператор університету</td><td>Перевіряти дані та вирішувати проблеми</td><td>Пошук студента, інспектор, ручна синхронізація, перегляд помилок</td></tr>
+            <tr><td>Адміністратор платформи</td><td>Керувати всією системою</td><td>Організації, користувачі, jobs, cron, failover, очищення даних</td></tr>
+            <tr><td>ІТ-служба університету</td><td>Підтримувати обмін</td><td>Provider API, тестове середовище, моніторинг доступності</td></tr>
+            <tr><td>Служба підтримки</td><td>Розслідувати звернення</td><td>Пошук, статуси, дати оновлення та технічні помилки</td></tr>
+          </tbody>
+        </table>
+        <p>У базовій моделі існують ролі `GUEST`, `STUDENT`, `TEACHER` та `ADMIN`. Поточні адміністративні права глобальні; для повноцінної роботи багатьох університетів потрібні ролі та доступи на рівні організації.</p>
+      </section>
+
+      <section id="functions">
+        <h2>3. Функціональні можливості</h2>
+        <div class="grid">
+          <div class="card"><strong>Реєстрація та доступ</strong>Підтвердження телефону через OTP, пароль, login, access/refresh JWT, відновлення доступу, зміна телефону та email.</div>
+          <div class="card"><strong>Верифікація студента</strong>Пошук людини у зовнішній системі за телефоном та створення локального профілю студента.</div>
+          <div class="card"><strong>Навчальні дані</strong>Курс, семестр, форма навчання, спеціальність, групи, дисципліни, оцінки й середній бал.</div>
+          <div class="card"><strong>Розклад</strong>Лекції, заняття, лабораторні, семінари, консультації, онлайн-події та екзамени.</div>
+          <div class="card"><strong>Навчальний календар</strong>Періоди навчання, сесії, канікули та інші елементи плану.</div>
+          <div class="card"><strong>Фінанси студента</strong>Стан оплати навчання, історія зарахувань, знижки та пільги.</div>
+          <div class="card"><strong>Платежі</strong>Платіжні шаблони, payment link, callback/webhook, 3-D Secure та токенізація карток.</div>
+          <div class="card"><strong>Новини</strong>Отримання RSS-публікацій та прив’язка матеріалів до університету.</div>
+        </div>
+      </section>
+
+      <section id="components" class="page-break">
+        <h2>4. Компоненти платформи</h2>
+        <pre><code>Мобільний застосунок               React Admin SPA
+          │                              │
+          └────────── HTTP/JSON ─────────┘
+                         │
+                    Express API
+                 /v1       /admin/api
+                         │
+             ┌───────────┼────────────┐
+             ▼           ▼            ▼
+        PostgreSQL     Redis       Зовнішні API
+        + Prisma       + BullMQ    університету/банку
+                         │
+                         ▼
+                       Worker</code></pre>
+        <table>
+          <thead><tr><th>Компонент</th><th>Технології</th><th>Відповідальність</th></tr></thead>
+          <tbody>
+            <tr><td>Backend API</td><td>Node.js, TypeScript, Express</td><td>Маршрути, авторизація, validation і бізнес-операції</td></tr>
+            <tr><td>Worker</td><td>BullMQ</td><td>Виконання тривалих та періодичних синхронізацій</td></tr>
+            <tr><td>Database</td><td>PostgreSQL, Prisma</td><td>Користувачі, навчальні, фінансові й операційні дані</td></tr>
+            <tr><td>Queue</td><td>Redis</td><td>Черги, повторні спроби, cron-завдання</td></tr>
+            <tr><td>Admin SPA</td><td>React, Vite, TanStack Query, Zustand</td><td>Моніторинг і робота операторів</td></tr>
+            <tr><td>Observability</td><td>Winston, Morgan, Kafka/Logstash</td><td>HTTP-логи та передача подій у зовнішню систему логування</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="data-model">
+        <h2>5. Модель даних</h2>
+        <pre><code>Organization
+ ├─ Department ─ Cafedra ─ Lecturer
+ │       ├─ UserStudent ─ StudentGroup ─ Group
+ │       └─ Discipline
+ ├─ Building ─ Auditorium ─ Schedule
+ ├─ OrganizationArticle
+ ├─ PaymentTemplate
+ └─ OrganizationSyncStatus
+
+User
+ ├─ UserStudent
+ │   ├─ StudentSchedules
+ │   ├─ Score / AverageScore
+ │   ├─ EducationPlan
+ │   ├─ PaymentHistory / Discounts
+ │   └─ StudentSyncStatus
+ ├─ Token / PhoneVerification
+ ├─ StudentPayment ─ PaymentTranState
+ └─ CardToken</code></pre>
+        <p>Схема містить 28 моделей і 20 enum. Центральна зв’язка — `User → UserStudent → Department → Organization`. Один користувач може мати кілька студентських профілів. Синхронізація контролюється окремо для студента або організації та конкретного типу даних.</p>
+      </section>
+
+      <section id="flows">
+        <h2>6. Основні процеси</h2>
+        <h3>Реєстрація та верифікація</h3>
+        <pre><code>Телефон → OTP → реєстрація User → JWT
+       → вибір університету → /studentinfo
+       → створення UserStudent → запуск синхронізацій</code></pre>
+        <h3>Періодичне оновлення</h3>
+        <pre><code>Cron → BullMQ → Worker → API університету
+     → нормалізація → транзакції Prisma
+     → оновлення SyncStatus → дані доступні застосунку</code></pre>
+        <h3>Оплата</h3>
+        <pre><code>PaymentTemplate → StudentPayment → банківська сесія
+     → hosted payment або token purchase → 3DS
+     → callback/webhook → PaymentTranState → фінальний статус</code></pre>
+      </section>
+
+      <section id="admin">
+        <h2>7. Адміністративна панель</h2>
+        <p>React-панель містить dashboard, список студентів, інспектор студента, запрошення, керування jobs, список організацій та сторінку організації.</p>
+        <table>
+          <thead><tr><th>Розділ</th><th>Що дає</th><th>Поточне обмеження</th></tr></thead>
+          <tbody>
+            <tr><td>Dashboard</td><td>Кількість станів, помилки, circuit breaker, організації</td><td>Не зберігається повна історія запусків</td></tr>
+            <tr><td>Students</td><td>Пошук, фільтри, перехід до інспектора</td><td>Ієрархія університет → кафедра → група обмежена</td></tr>
+            <tr><td>Inspector</td><td>Розклад, оцінки, оплати, знижки, план, sync status</td><td>Є небезпечні операції видалення; потрібен audit log</td></tr>
+            <tr><td>Jobs</td><td>Запуск, bulk trigger, cron, статистика</td><td>Потрібне посилення authorization і пояснення статусів</td></tr>
+            <tr><td>Organizations</td><td>Список, редагування, стан синхронізації</td><td>Немає branding, tenant-admins та integration settings</td></tr>
+            <tr><td>Payments</td><td>Частково видно оплату навчання в інспекторі</td><td>Окремого моніторингу банківських платежів немає</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="integrations">
+        <h2>8. Зовнішні інтеграції</h2>
+        <ul>
+          <li><strong>Система університету:</strong> профіль, баланс, розклад, оцінки, календар, платежі, знижки та RSS.</li>
+          <li><strong>OTP і SMS:</strong> підтвердження телефону та відновлення доступу.</li>
+          <li><strong>Email:</strong> підтвердження адреси й сервісні повідомлення.</li>
+          <li><strong>TASLink:</strong> payment link, токенізація, покупка, 3-D Secure та статус транзакції.</li>
+          <li><strong>Kafka/Logstash:</strong> необов’язкова централізована доставка логів.</li>
+        </ul>
+        <p>Поточна конфігурація університетського API глобальна. Для моделі «один університет — одна екосистема» потрібні окремі credentials, endpoint, branding, feature flags і графік синхронізації для кожного `organizationId`.</p>
+      </section>
+
+      <section id="security-app" class="page-break">
+        <h2>9. Безпека</h2>
+        <p>Застосунок використовує JWT, Passport, password hashing, Joi validation, Helmet, XSS-фільтрацію, rate limiting, CORS і централізований error handler.</p>
+        <h3>Основні ризики, які потребують закриття</h3>
+        <ul>
+          <li>Нерівномірне застосування authorization до адміністративних endpoints.</li>
+          <li>Глобальна роль ADMIN без обмеження університетом.</li>
+          <li>Вимкнена перевірка TLS-сертифіката MAUP.</li>
+          <li>Відсутність повного журналу адміністративних дій.</li>
+          <li>Необхідність обмежити CORS конкретними origin.</li>
+          <li>Фінансові та персональні дані потребують маскування в логах.</li>
+          <li>Відомі npm vulnerabilities мають бути проаналізовані без автоматичного force-upgrade.</li>
+        </ul>
+      </section>
+
+      <section id="deployment">
+        <h2>10. Розгортання та експлуатація</h2>
+        <p>API та worker масштабуються окремо. PostgreSQL є основним сховищем, Redis — інфраструктурою черг. Для Kubernetes у репозиторії є Helm chart. Dockerfile збирає backend і React SPA.</p>
+        <table>
+          <thead><tr><th>Процес</th><th>Команда/артефакт</th><th>Примітка</th></tr></thead>
+          <tbody>
+            <tr><td>Development API</td><td><code>npm run dev</code></td><td>Watch mode, порт 3000</td></tr>
+            <tr><td>Worker</td><td><code>npm run worker:dev</code></td><td>Повинен працювати окремо</td></tr>
+            <tr><td>Admin SPA</td><td><code>admin-spa: npm run dev</code></td><td>Vite, порт 5173</td></tr>
+            <tr><td>Міграції</td><td><code>npm run db:migrate</code></td><td>Prisma migrate deploy</td></tr>
+            <tr><td>Build</td><td><code>npm run build</code></td><td>TypeScript → build</td></tr>
+            <tr><td>Health</td><td><code>/v1/actuator/health</code></td><td>Потрібно додати readiness PostgreSQL/Redis</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="limits">
+        <h2>11. Поточні обмеження</h2>
+        <ul>
+          <li>Архітектура ще не забезпечує повну tenant-ізоляцію кількох університетів.</li>
+          <li>Немає моделей branding та налаштувань університету.</li>
+          <li>Немає окремого UI для платіжних транзакцій і карткових токенів.</li>
+          <li>Історія синхронізацій моделюється недостатньо: переважно зберігається поточний стан.</li>
+          <li>Стара EJS-адмінка співіснує з React SPA.</li>
+          <li>Маршрути `/admin`, `/admin/api` та `/api/admin` налаштовані неузгоджено.</li>
+          <li>Між Prisma-схемою та міграціями було виявлено розбіжність enum `SUSPENDED`.</li>
+          <li>Штатний test script посилається на відсутню команду `db:push`.</li>
+          <li>Назви деяких полів містять історичні помилки: `semestr`, `discaunt`, `edutaion`, `autidotirum`.</li>
+        </ul>
+      </section>
+
+      <section id="development">
+        <h2>12. Рекомендований розвиток</h2>
+        <ol>
+          <li>Закрити адміністративні endpoints єдиною authentication та permission policy.</li>
+          <li>Додати tenant-моделі, ролі університету та автоматичний organization scope.</li>
+          <li>Додати branding, feature flags і конфігурацію інтеграцій на університет.</li>
+          <li>Виправити міграції та перевіряти чисте розгортання БД у CI.</li>
+          <li>Додати історію запусків, correlation ID та audit log.</li>
+          <li>Стандартизувати Provider API через затверджений OpenAPI і runtime validation.</li>
+          <li>Додати платіжний operational dashboard.</li>
+          <li>Прибрати старі EJS-сторінки після перенесення функцій.</li>
+          <li>Уніфікувати маршрути frontend/backend/ingress.</li>
+          <li>Додати contract, security, isolation, migration і end-to-end tests.</li>
+        </ol>
+        <div class="callout good"><strong>Підсумок.</strong> e-osvita вже має основу повноцінної освітньої платформи: модель студента, навчальні дані, платежі, черги, worker та адміністративний інтерфейс. Основний наступний крок — перетворити одноінтеграційну систему на безпечну multi-tenant-платформу з контрольованим контрактом і доказовою ізоляцією університетів.</div>
+      </section>
+
+      <div class="footer">e-osvita · окремий опис платформи · не входить до інтеграційного PDF</div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
