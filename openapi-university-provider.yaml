@@ -14,11 +14,17 @@ info:
 
     **Виконання запитів:** сервер нижче демонстраційний. Перед тестуванням університет
     надає окремий test URL, service account та синтетичного студента.
+
+    **Публічний mock:** оберіть сервер `GitHub Pages mock API`, натисніть Authorize
+    і введіть username `test`, password `123`. Тестові запити обробляються в браузері
+    та нікуди не передаються.
   contact:
     name: Команда інтеграції e-osvita
   license:
     name: Proprietary integration contract
 servers:
+  - url: https://wwchugunov.github.io/uosvitabackand-docs/mock-api
+    description: GitHub Pages mock API — синтетичні дані, логін test, пароль 123
   - url: https://university.example/api/e-osvita/v1
     description: Демонстраційна адреса — запити на неї не використовуються у production
 tags:

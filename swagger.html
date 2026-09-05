@@ -28,12 +28,12 @@
     <a href="developer-handover.html">Передача розробнику</a>
     <a href="openapi-university-provider.yaml" download>Provider OpenAPI</a>
   </header>
-  <div class="notice"><strong>Безпечний режим.</strong> Це публічний контракт, який реалізує університет. Вказано демонстраційний домен <code>university.example</code>. Swagger не виконує запити самостійно: це можливо лише після ручного натискання <em>Try it out</em> → <em>Execute</em>.</div>
+  <div class="notice"><strong>Тестовий доступ:</strong> username <code>test</code>, password <code>123</code>. Для безпечних проб оберіть сервер <em>GitHub Pages mock API</em>. Відповіді синтетичні, а mock-запити перехоплюються у браузері й не надсилаються зовнішнім системам.</div>
   <div id="swagger-ui"></div>
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
   <script>
-    window.onload = () => SwaggerUIBundle({
+    const startSwagger = () => SwaggerUIBundle({
       url: './openapi-university-provider.yaml',
       dom_id: '#swagger-ui',
       deepLinking: true,
@@ -46,6 +46,19 @@
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
       layout: 'StandaloneLayout'
     });
+
+    window.onload = async () => {
+      if (!('serviceWorker' in navigator)) return startSwagger();
+      await navigator.serviceWorker.register('./mock-sw.js');
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller && !sessionStorage.getItem('mock-sw-reload')) {
+        sessionStorage.setItem('mock-sw-reload', '1');
+        location.reload();
+        return;
+      }
+      sessionStorage.removeItem('mock-sw-reload');
+      startSwagger();
+    };
   </script>
 </body>
 </html>
