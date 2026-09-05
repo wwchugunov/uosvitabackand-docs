@@ -9,14 +9,18 @@
   <style>
     html { box-sizing: border-box; overflow-y: scroll; }
     *, *::before, *::after { box-sizing: inherit; }
-    body { margin: 0; background: #f5f7fb; }
-    .topbar-custom { display:flex; align-items:center; gap:18px; padding:14px 24px; background:#10223f; color:#fff; font:14px system-ui,sans-serif; }
-    .topbar-custom strong { font-size:19px; }
-    .topbar-custom a { color:#dbeafe; text-decoration:none; }
+    body { margin:0; background-color:#e9e6dc; background-image:linear-gradient(rgba(40,40,35,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(40,40,35,.035) 1px,transparent 1px); background-size:24px 24px; }
+    .topbar-custom { display:flex; align-items:center; gap:18px; padding:14px 24px; background:#20201d; color:#fff; border-bottom:4px solid #bd3b19; font:13px "Courier New",monospace; }
+    .topbar-custom strong { font-size:20px; color:#ff6b3d; letter-spacing:-.04em; }
+    .topbar-custom a { color:#d4d0c5; text-decoration:none; }
     .topbar-custom a:hover { color:#fff; }
-    .notice { margin:18px auto 0; max-width:1460px; padding:13px 18px; border:1px solid #f2c96d; border-radius:8px; background:#fff8df; color:#5e4500; font:14px/1.45 system-ui,sans-serif; }
+    .notice { margin:18px auto 0; max-width:1460px; padding:14px 18px; border:1px solid #cbc8bb; border-left:5px solid #bd3b19; border-radius:2px; background:#fffdf7; color:#3e3d37; font:14px/1.45 system-ui,sans-serif; box-shadow:3px 3px 0 rgba(50,48,42,.12); }
     .swagger-ui .topbar { display:none; }
     .swagger-ui .information-container { padding-top:22px; }
+    .swagger-ui .info .title, .swagger-ui .opblock-tag { letter-spacing:-.025em; }
+    .swagger-ui .opblock { border-radius:2px; box-shadow:none; }
+    .swagger-ui .btn { border-radius:2px; }
+    .swagger-ui select { border-radius:2px; }
     @media (max-width:720px) { .topbar-custom { flex-wrap:wrap; } }
   </style>
 </head>
