@@ -2,17 +2,40 @@ openapi: 3.0.3
 info:
   title: e-osvita University Provider API
   version: 1.0.0-draft
-  description: >-
+  description: |
     Контракт API, який інформаційна система університету надає платформі e-osvita.
-    Специфікація відображає поточний адаптер MAUP і містить рекомендації для стабільної v1.
+
+    **Напрямок обміну:** e-osvita є клієнтом, а університет — постачальником даних.
+    Специфікація відображає поточний MAUP-сумісний адаптер. Поля з історичним
+    написанням `discaunt_*` збережені для сумісності.
+
+    **Формат:** JSON у UTF-8. Дати — ISO 8601 (`YYYY-MM-DD`). Порожнє допустиме
+    значення передається як `null`. Ідентифікатор студента стабільний у межах університету.
+
+    **Виконання запитів:** сервер нижче демонстраційний. Перед тестуванням університет
+    надає окремий test URL, service account та синтетичного студента.
+  contact:
+    name: Команда інтеграції e-osvita
+  license:
+    name: Proprietary integration contract
 servers:
   - url: https://university.example/api/e-osvita/v1
+    description: Демонстраційна адреса — запити на неї не використовуються у production
+tags:
+  - name: Student
+    description: Ідентифікація та академічний профіль студента
+  - name: Education
+    description: Розклад, оцінки та календар навчального процесу
+  - name: Tuition
+    description: Баланс, платежі, пільги й знижки за навчання
 security:
   - basicAuth: []
 paths:
   /studentinfo:
     post:
+      tags: [Student]
       summary: Пошук профілів студента
+      description: Повертає всі активні студентські профілі, що відповідають телефону або зовнішньому ID. Масив потрібен, оскільки одна особа може мати кілька програм навчання.
       operationId: getStudentInfo
       requestBody:
         required: true
@@ -33,10 +56,14 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Student' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /saldo:
     post:
+      tags: [Tuition]
       summary: Поточний баланс оплати навчання
+      description: Додатне або від'ємне значення трактується згідно з узгодженим правилом університету; правило знака фіксується під час приймання інтеграції.
       operationId: getStudentBalance
       requestBody: { $ref: '#/components/requestBodies/StudentId' }
       responses:
@@ -51,9 +78,14 @@ paths:
                   required: [student_id, saldo]
                   properties: { student_id: { type: integer }, saldo: { type: number, format: double } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /schedule:
     post:
+      tags: [Education]
       summary: Розклад або екзаменаційна сесія студента
+      description: Без `zes_schedule` повертає навчальний розклад. Значення `zes_schedule=1` запитує екзаменаційну сесію.
       operationId: getStudentSchedule
       requestBody:
         required: true
@@ -72,9 +104,15 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/ScheduleResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /marks:
     post:
+      tags: [Education]
       summary: Оцінки студента
+      description: Повертає дисципліни та результати, згруповані за семестрами.
       operationId: getStudentMarks
       requestBody: { $ref: '#/components/requestBodies/StudentId' }
       responses:
@@ -83,9 +121,14 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/MarksResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /calgraph:
     post:
+      tags: [Education]
       summary: Календар навчального процесу
+      description: Періоди навчання, сесії, практики та канікул за семестрами.
       operationId: getCalendarGraph
       requestBody: { $ref: '#/components/requestBodies/StudentId' }
       responses:
@@ -94,9 +137,14 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/CalendarEntry' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /payments:
     post:
+      tags: [Tuition]
       summary: Історія оплати навчання
+      description: Історія зарахованих університетом оплат. Це не API банківського еквайрингу.
       operationId: getStudentPayments
       requestBody: { $ref: '#/components/requestBodies/StudentId' }
       responses:
@@ -105,9 +153,14 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/PaymentResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /discounts:
     post:
+      tags: [Tuition]
       summary: Пільги та знижки студента
+      description: Чинні та історичні знижки/пільги. Назви `discaunt_*` є полями поточного legacy-контракту.
       operationId: getStudentDiscounts
       requestBody: { $ref: '#/components/requestBodies/StudentId' }
       responses:
@@ -116,9 +169,15 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/DiscountResponse' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   securitySchemes:
-    basicAuth: { type: http, scheme: basic }
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Окремий read-only service account для тестового або production середовища
   requestBodies:
     StudentId:
       required: true
@@ -129,9 +188,38 @@ components:
             required: [student_id]
             properties: { student_id: { type: integer, example: 10001 } }
   responses:
-    Unauthorized: { description: Невірні або відсутні облікові дані }
-    Unavailable: { description: Тимчасова недоступність сервісу }
+    BadRequest:
+      description: Невалідне тіло або значення параметра
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Невірні або відсутні облікові дані
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Перевищено погоджений rate limit; врахуйте заголовок Retry-After
+      headers:
+        Retry-After:
+          schema: { type: integer, example: 60 }
+          description: Кількість секунд до повторної спроби
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: Тимчасова недоступність сервісу; дозволений повтор з exponential backoff
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: INVALID_STUDENT_ID }
+        message: { type: string, example: Поле student_id має бути додатним цілим числом }
+        correlation_id: { type: string, example: 01J7M6T2NS3P5CJ9TQCA4MH7ZR }
     Student:
       type: object
       required: [student_id, last_name, first_name, phone_number, institute, group, course, form_learn, speciality, price, education_start, education_end]
@@ -241,4 +329,3 @@ components:
               discaunt_percents: { type: integer }
               discaunt_id: { type: integer, nullable: true }
               institute_id: { type: integer, nullable: true }
-

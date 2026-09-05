@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>e-osvita — Swagger API</title>
+  <meta name="description" content="Інтерактивна OpenAPI-документація інтеграції університету з e-osvita">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    html { box-sizing: border-box; overflow-y: scroll; }
+    *, *::before, *::after { box-sizing: inherit; }
+    body { margin: 0; background: #f5f7fb; }
+    .topbar-custom { display:flex; align-items:center; gap:18px; padding:14px 24px; background:#10223f; color:#fff; font:14px system-ui,sans-serif; }
+    .topbar-custom strong { font-size:19px; }
+    .topbar-custom a { color:#dbeafe; text-decoration:none; }
+    .topbar-custom a:hover { color:#fff; }
+    .notice { margin:18px auto 0; max-width:1460px; padding:13px 18px; border:1px solid #f2c96d; border-radius:8px; background:#fff8df; color:#5e4500; font:14px/1.45 system-ui,sans-serif; }
+    .swagger-ui .topbar { display:none; }
+    .swagger-ui .information-container { padding-top:22px; }
+    @media (max-width:720px) { .topbar-custom { flex-wrap:wrap; } }
+  </style>
+</head>
+<body>
+  <header class="topbar-custom">
+    <strong>e-osvita API</strong>
+    <a href="index.html">Посібник інтеграції</a>
+    <a href="application-overview.html">Опис застосунку</a>
+    <a href="developer-handover.html">Передача розробнику</a>
+    <a href="openapi-university-provider.yaml" download>Provider OpenAPI</a>
+  </header>
+  <div class="notice"><strong>Безпечний режим.</strong> Це публічний контракт, який реалізує університет. Вказано демонстраційний домен <code>university.example</code>. Swagger не виконує запити самостійно: це можливо лише після ручного натискання <em>Try it out</em> → <em>Execute</em>.</div>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = () => SwaggerUIBundle({
+      url: './openapi-university-provider.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      displayRequestDuration: true,
+      filter: true,
+      persistAuthorization: false,
+      tryItOutEnabled: false,
+      docExpansion: 'list',
+      defaultModelsExpandDepth: 1,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      layout: 'StandaloneLayout'
+    });
+  </script>
+</body>
+</html>
